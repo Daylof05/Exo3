@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, Text, TextInput, Button, Alert } from 'react-native';
+import { View, Text, TextInput, Button, Alert, FlatList } from 'react-native';
 
 type UserType = {
   id: number;
@@ -7,114 +7,92 @@ type UserType = {
   email: string;
 };
 
-const fetchData = async (): Promise<UserType[]> => {
-  try {
-    const response = await fetch('https://jsonplaceholder.typicode.com/users');
-    const data: UserType[] = await response.json();
-    return data;
-  } catch (error) {
-    console.error(error);
-    return [];
-  }
-};
-
-const postData = async (userData: { name: string; email: string }): Promise<UserType> => {
-  try {
-    const response = await fetch('https://jsonplaceholder.typicode.com/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
-    if (!response.ok) throw new Error('Something went wrong');
-    return await response.json();
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
-};
-
-const updateUser = async (userId: number, userData: { name: string; email: string }): Promise<UserType> => {
-  try {
-    const response = await fetch(`https://jsonplaceholder.typicode.com/users/${userId}`, {
-      method: 'PUT', 
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
-    if (!response.ok) throw new Error('Something went wrong');
-    return await response.json();
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
-};
-
-
-const App: React.FC = () => {
-  const [data, setData] = useState<UserType[]>([]);
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+const App = () => {
+  const [users, setUsers] = useState<UserType[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    fetchData().then(setData);
+    fetchData().then(data => setUsers(data));
   }, []);
 
-  const handleAddOrUpdateUser = async () => {
-    if (!name || !email) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
-      return;
-    }
-
+  async function fetchData(): Promise<UserType[]> {
     try {
-      if (selectedUser) {
-        const updatedUser = await updateUser(selectedUser.id, { name, email });
-        const newData = data.map(item => item.id === updatedUser.id ? updatedUser : item);
-        setData(newData);
-        Alert.alert('Succès', 'Utilisateur mis à jour avec succès.');
-      } else {
-        const newUser = await postData({ name, email });
-        setData([...data, newUser]);
-        Alert.alert('Succès', 'Utilisateur ajouté avec succès.');
-      }
+      const response = await fetch('https://jsonplaceholder.typicode.com/users');
+      const data: UserType[] = await response.json();
+      return data;
     } catch (error) {
-      Alert.alert('Erreur', 'Problème lors de l\'ajout/mise à jour de l\'utilisateur.');
+      console.error(error);
+      return [];
     }
+  }
+  
 
-    setName('');
-    setEmail('');
-    setSelectedUser(null);
-  };
+  async function postData() {
+    try {
+      const response = await fetch('https://jsonplaceholder.typicode.com/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email }),
+      });
+      if (!response.ok) throw new Error('Erreur lors de la création');
+      const newUser = await response.json();
+      setUsers(currentUsers => [...currentUsers, newUser]);
+      Alert.alert('Utilisateur créé');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue';
+      Alert.alert('Erreur', message);
+    }
+  }
+
+  async function updateUser() {
+    try {
+      const response = await fetch(`https://jsonplaceholder.typicode.com/users/10`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email }),
+      });
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
+      const updatedUser = await response.json();
+      setUsers(currentUsers => currentUsers.map(user => user.id === 10 ? updatedUser : user));
+      Alert.alert('Utilisateur mis à jour');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue';
+      Alert.alert('Erreur', message);
+    }
+  }
+
+  async function deleteUser() {
+    try {
+      const response = await fetch(`https://jsonplaceholder.typicode.com/users/10`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
+      setUsers(currentUsers => currentUsers.filter(user => user.id !== 10));
+      Alert.alert('Utilisateur supprimé');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue';
+      Alert.alert('Erreur', message);
+    }
+  }
 
   return (
     <View>
-      <TextInput
-        placeholder="Name"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <Button
-        title={selectedUser ? "Mettre à jour l'utilisateur" : "Ajouter un utilisateur"}
-        onPress={handleAddOrUpdateUser}
-      />
+      <TextInput placeholder="Nom" value={name} onChangeText={setName} />
+      <TextInput placeholder="Email" value={email} onChangeText={setEmail} />
+      <Button title="Créer un utilisateur" onPress={postData} />
+      <Button title="Mettre à jour l'utilisateur" onPress={updateUser} />
+      <Button title="Supprimer l'utilisateur" onPress={deleteUser} />
       <FlatList
-        data={data}
-        renderItem={({ item }) => (
-          <View>
-            <Text onPress={() => { setSelectedUser(item); setName(item.name); setEmail(item.email); }}>
-              {item.name} - {item.email}
-            </Text>
-          </View>
-        )}
+        data={users}
         keyExtractor={item => item.id.toString()}
+        renderItem={({ item }) => (
+          <Text>{`${item.name} (${item.email})`}</Text>
+        )}
       />
     </View>
   );
